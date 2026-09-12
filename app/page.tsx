@@ -2,9 +2,8 @@
 
 import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { LandmarkPins } from './components/AnatoCanvas';
+import { LandmarkPins, CalibrationPins } from './components/AnatoCanvas';
 
-// Dynamically import Konva canvas component with SSR disabled
 const AnatoCanvas = dynamic(() => import('./components/AnatoCanvas'), {
   ssr: false,
   loading: () => (
@@ -17,12 +16,21 @@ const AnatoCanvas = dynamic(() => import('./components/AnatoCanvas'), {
 export default function AnatoScanDashboard() {
   const [image, setImage] = useState<string | null>(null);
 
-  // Initial Pin Positions
+  // Anatomical Pin Positions
   const [pins, setPins] = useState<LandmarkPins>({
     acromion: { x: 200, y: 100 },
     olecranon: { x: 300, y: 280 },
     styloid: { x: 420, y: 400 },
   });
+
+  // Calibration Scale Pins
+  const [calPins, setCalPins] = useState<CalibrationPins>({
+    calA: { x: 50, y: 450 },
+    calB: { x: 150, y: 450 },
+  });
+
+  // Known real-world distance between Cal A and Cal B (in mm)
+  const [knownMm, setKnownMm] = useState<number>(50);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -32,11 +40,23 @@ export default function AnatoScanDashboard() {
   };
 
   const handlePinDrag = (pinKey: keyof LandmarkPins, x: number, y: number) => {
-    setPins((prev) => ({
-      ...prev,
-      [pinKey]: { x, y },
-    }));
+    setPins((prev) => ({ ...prev, [pinKey]: { x, y } }));
   };
+
+  const handleCalPinDrag = (calKey: keyof CalibrationPins, x: number, y: number) => {
+    setCalPins((prev) => ({ ...prev, [calKey]: { x, y } }));
+  };
+
+  // Distance helper in pixels
+  const getPixelDistance = (p1: { x: number; y: number }, p2: { x: number; y: number }) => {
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  // Calibration Ratio: mm per pixel
+  const calPixelDistance = getPixelDistance(calPins.calA, calPins.calB);
+  const mmPerPixel = calPixelDistance > 0 ? knownMm / calPixelDistance : 0;
 
   // Calculate live angle at Olecranon joint (degrees)
   const calculateAngle = () => {
@@ -56,28 +76,38 @@ export default function AnatoScanDashboard() {
     return ((angleRad * 180) / Math.PI).toFixed(1);
   };
 
-  // Calculate pixel distance offset
-  const calculateOffset = () => {
-    const dx = pins.olecranon.x - pins.acromion.x;
-    const dy = pins.olecranon.y - pins.acromion.y;
-    return Math.sqrt(dx * dx + dy * dy).toFixed(1);
-  };
+  // Acromion-Olecranon Segment lengths
+  const pxAcromionOlecranon = getPixelDistance(pins.acromion, pins.olecranon);
+  const mmAcromionOlecranon = (pxAcromionOlecranon * mmPerPixel).toFixed(1);
+  const cmAcromionOlecranon = (pxAcromionOlecranon * mmPerPixel / 10).toFixed(2);
+
+  // Olecranon-Styloid Segment lengths
+  const pxOlecranonStyloid = getPixelDistance(pins.olecranon, pins.styloid);
+  const mmOlecranonStyloid = (pxOlecranonStyloid * mmPerPixel).toFixed(1);
 
   return (
     <main className="min-h-screen p-8 bg-slate-900 text-slate-100 flex flex-col items-center">
-      <header className="w-full max-w-6xl mb-8 border-b border-slate-700 pb-4">
-        <h1 className="text-3xl font-bold text-blue-400">
-          AnatoScan AI — Biomechanical Measurement
-        </h1>
-        <p className="text-slate-400 text-sm mt-1">
-          Drag anatomical pins to calculate real-time joint kinematics
-        </p>
+      <header className="w-full max-w-6xl mb-8 border-b border-slate-700 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-blue-400">
+            AnatoScan AI — Biomechanical Measurement
+          </h1>
+          <p className="text-slate-400 text-sm mt-1">
+            Drag anatomical & calibration pins for precise kinematic assessment
+          </p>
+        </div>
       </header>
 
       <section className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 bg-slate-800 rounded-xl p-6 border border-slate-700 flex flex-col items-center justify-center min-h-[520px]">
           {image ? (
-            <AnatoCanvas imageUrl={image} pins={pins} onPinDrag={handlePinDrag} />
+            <AnatoCanvas
+              imageUrl={image}
+              pins={pins}
+              calPins={calPins}
+              onPinDrag={handlePinDrag}
+              onCalPinDrag={handleCalPinDrag}
+            />
           ) : (
             <div className="text-center">
               <p className="text-slate-400 mb-4">No scan image loaded</p>
@@ -94,10 +124,31 @@ export default function AnatoScanDashboard() {
           )}
         </div>
 
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 flex flex-col gap-4">
+        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 flex flex-col gap-5">
           <h2 className="text-xl font-semibold text-slate-200">
-            Live Kinematics
+            Live Kinematics & Scale
           </h2>
+
+          {/* CALIBRATION CONTROL CARD */}
+          <div className="p-4 bg-yellow-950/40 border border-yellow-700/50 rounded-lg space-y-3">
+            <span className="text-xs font-semibold text-yellow-400 uppercase tracking-wider block">
+              Scale Calibration (Yellow Line)
+            </span>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-slate-300 whitespace-nowrap">Known Scale (mm):</label>
+              <input
+                type="number"
+                value={knownMm}
+                onChange={(e) => setKnownMm(Math.max(1, Number(e.target.value)))}
+                className="w-20 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-amber-300 font-mono text-sm focus:outline-none focus:border-yellow-500"
+              />
+            </div>
+            <div className="text-xs font-mono text-yellow-300/80">
+              Scale Line: {calPixelDistance.toFixed(1)} px | Scale: {mmPerPixel.toFixed(3)} mm/px
+            </div>
+          </div>
+
+          {/* KINEMATIC METRICS */}
           <div className="space-y-3">
             <div className="p-3 bg-slate-900 rounded border border-slate-700">
               <span className="text-xs text-slate-400 uppercase tracking-wider block">
@@ -107,22 +158,32 @@ export default function AnatoScanDashboard() {
                 {calculateAngle()}°
               </span>
             </div>
+
             <div className="p-3 bg-slate-900 rounded border border-slate-700">
               <span className="text-xs text-slate-400 uppercase tracking-wider block">
                 Acromion-Olecranon Segment
               </span>
-              <span className="text-2xl font-mono font-bold text-blue-400">
-                {calculateOffset()} px
-              </span>
+              <div className="flex justify-between items-baseline mt-1">
+                <span className="text-2xl font-mono font-bold text-blue-400">
+                  {mmAcromionOlecranon} mm
+                </span>
+                <span className="text-sm font-mono text-slate-400">
+                  ({cmAcromionOlecranon} cm / {pxAcromionOlecranon.toFixed(0)} px)
+                </span>
+              </div>
             </div>
+
             <div className="p-3 bg-slate-900 rounded border border-slate-700">
               <span className="text-xs text-slate-400 uppercase tracking-wider block">
-                Pin Coordinates
+                Olecranon-Styloid Segment
               </span>
-              <div className="text-xs font-mono text-slate-300 mt-1 space-y-1">
-                <div>Acromion: X:{pins.acromion.x.toFixed(0)} Y:{pins.acromion.y.toFixed(0)}</div>
-                <div>Olecranon: X:{pins.olecranon.x.toFixed(0)} Y:{pins.olecranon.y.toFixed(0)}</div>
-                <div>Styloid: X:{pins.styloid.x.toFixed(0)} Y:{pins.styloid.y.toFixed(0)}</div>
+              <div className="flex justify-between items-baseline mt-1">
+                <span className="text-2xl font-mono font-bold text-purple-400">
+                  {mmOlecranonStyloid} mm
+                </span>
+                <span className="text-sm font-mono text-slate-400">
+                  ({pxOlecranonStyloid.toFixed(0)} px)
+                </span>
               </div>
             </div>
           </div>
