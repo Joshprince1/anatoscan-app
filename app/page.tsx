@@ -8,7 +8,7 @@ const AnatoCanvas = dynamic(() => import('./components/AnatoCanvas'), {
   ssr: false,
   loading: () => (
     <div className="w-[600px] h-[500px] bg-slate-950 border border-slate-700 rounded-lg flex items-center justify-center text-slate-400">
-      Initializing Interactive Canvas...
+      Initializing Multi-Segment Canvas...
     </div>
   ),
 });
@@ -16,20 +16,20 @@ const AnatoCanvas = dynamic(() => import('./components/AnatoCanvas'), {
 export default function AnatoScanDashboard() {
   const [image, setImage] = useState<string | null>(null);
 
-  // Anatomical Pin Positions
+  // 4-Pin Multi-Segment Landmark Positions
   const [pins, setPins] = useState<LandmarkPins>({
-    acromion: { x: 200, y: 100 },
-    olecranon: { x: 300, y: 280 },
-    styloid: { x: 420, y: 400 },
+    shoulder: { x: 180, y: 100 },
+    elbow: { x: 280, y: 240 },
+    wrist: { x: 380, y: 340 },
+    knuckle: { x: 460, y: 420 },
   });
 
   // Calibration Scale Pins
   const [calPins, setCalPins] = useState<CalibrationPins>({
-    calA: { x: 50, y: 450 },
-    calB: { x: 150, y: 450 },
+    calA: { x: 50, y: 460 },
+    calB: { x: 150, y: 460 },
   });
 
-  // Known real-world distance between Cal A and Cal B (in mm)
   const [knownMm, setKnownMm] = useState<number>(50);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -47,23 +47,17 @@ export default function AnatoScanDashboard() {
     setCalPins((prev) => ({ ...prev, [calKey]: { x, y } }));
   };
 
-  // Distance helper in pixels
   const getPixelDistance = (p1: { x: number; y: number }, p2: { x: number; y: number }) => {
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
     return Math.sqrt(dx * dx + dy * dy);
   };
 
-  // Calibration Ratio: mm per pixel
   const calPixelDistance = getPixelDistance(calPins.calA, calPins.calB);
   const mmPerPixel = calPixelDistance > 0 ? knownMm / calPixelDistance : 0;
 
-  // Calculate live angle at Olecranon joint (degrees)
-  const calculateAngle = () => {
-    const p1 = pins.acromion;
-    const p2 = pins.olecranon;
-    const p3 = pins.styloid;
-
+  // Generic angle calculation helper for any 3 consecutive points
+  const calculateJointAngle = (p1: { x: number; y: number }, p2: { x: number; y: number }, p3: { x: number; y: number }) => {
     const v1 = { x: p1.x - p2.x, y: p1.y - p2.y };
     const v2 = { x: p3.x - p2.x, y: p3.y - p2.y };
 
@@ -76,24 +70,32 @@ export default function AnatoScanDashboard() {
     return ((angleRad * 180) / Math.PI).toFixed(1);
   };
 
-  // Acromion-Olecranon Segment lengths
-  const pxAcromionOlecranon = getPixelDistance(pins.acromion, pins.olecranon);
-  const mmAcromionOlecranon = (pxAcromionOlecranon * mmPerPixel).toFixed(1);
-  const cmAcromionOlecranon = (pxAcromionOlecranon * mmPerPixel / 10).toFixed(2);
+  // Elbow Angle (Shoulder - Elbow - Wrist)
+  const elbowAngle = calculateJointAngle(pins.shoulder, pins.elbow, pins.wrist);
+  // Wrist Angle (Elbow - Wrist - Knuckle)
+  const wristAngle = calculateJointAngle(pins.elbow, pins.wrist, pins.knuckle);
 
-  // Olecranon-Styloid Segment lengths
-  const pxOlecranonStyloid = getPixelDistance(pins.olecranon, pins.styloid);
-  const mmOlecranonStyloid = (pxOlecranonStyloid * mmPerPixel).toFixed(1);
+  // Segment metrics
+  const pxShoulderElbow = getPixelDistance(pins.shoulder, pins.elbow);
+  const mmShoulderElbow = (pxShoulderElbow * mmPerPixel).toFixed(1);
+
+  const pxElbowWrist = getPixelDistance(pins.elbow, pins.wrist);
+  const mmElbowWrist = (pxElbowWrist * mmPerPixel).toFixed(1);
+
+  const pxWristKnuckle = getPixelDistance(pins.wrist, pins.knuckle);
+  const mmWristKnuckle = (pxWristKnuckle * mmPerPixel).toFixed(1);
+
+  const totalChainMm = ((pxShoulderElbow + pxElbowWrist + pxWristKnuckle) * mmPerPixel).toFixed(1);
 
   return (
     <main className="min-h-screen p-8 bg-slate-900 text-slate-100 flex flex-col items-center">
       <header className="w-full max-w-6xl mb-8 border-b border-slate-700 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-blue-400">
-            AnatoScan AI — Biomechanical Measurement
+            AnatoScan AI — Multi-Segment Kinematic Chain
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Drag anatomical & calibration pins for precise kinematic assessment
+            Full-limb kinematic analysis with multi-joint angular telemetry
           </p>
         </div>
       </header>
@@ -124,18 +126,18 @@ export default function AnatoScanDashboard() {
           )}
         </div>
 
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 flex flex-col gap-5">
+        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 flex flex-col gap-4 overflow-y-auto max-h-[600px]">
           <h2 className="text-xl font-semibold text-slate-200">
-            Live Kinematics & Scale
+            Multi-Segment Telemetry
           </h2>
 
-          {/* CALIBRATION CONTROL CARD */}
-          <div className="p-4 bg-yellow-950/40 border border-yellow-700/50 rounded-lg space-y-3">
+          {/* CALIBRATION CARD */}
+          <div className="p-3 bg-yellow-950/40 border border-yellow-700/50 rounded-lg space-y-2">
             <span className="text-xs font-semibold text-yellow-400 uppercase tracking-wider block">
-              Scale Calibration (Yellow Line)
+              Scale Calibration
             </span>
             <div className="flex items-center gap-2">
-              <label className="text-xs text-slate-300 whitespace-nowrap">Known Scale (mm):</label>
+              <label className="text-xs text-slate-300">Known (mm):</label>
               <input
                 type="number"
                 value={knownMm}
@@ -144,47 +146,51 @@ export default function AnatoScanDashboard() {
               />
             </div>
             <div className="text-xs font-mono text-yellow-300/80">
-              Scale Line: {calPixelDistance.toFixed(1)} px | Scale: {mmPerPixel.toFixed(3)} mm/px
+              Ratio: {mmPerPixel.toFixed(3)} mm/px
             </div>
           </div>
 
-          {/* KINEMATIC METRICS */}
-          <div className="space-y-3">
+          {/* JOINT ANGLES */}
+          <div className="grid grid-cols-2 gap-3">
             <div className="p-3 bg-slate-900 rounded border border-slate-700">
-              <span className="text-xs text-slate-400 uppercase tracking-wider block">
-                Flexion Angle (Olecranon)
-              </span>
-              <span className="text-2xl font-mono font-bold text-emerald-400">
-                {calculateAngle()}°
-              </span>
+              <span className="text-xs text-slate-400 uppercase tracking-wider block">Elbow Angle</span>
+              <span className="text-xl font-mono font-bold text-emerald-400">{elbowAngle}°</span>
+            </div>
+            <div className="p-3 bg-slate-900 rounded border border-slate-700">
+              <span className="text-xs text-slate-400 uppercase tracking-wider block">Wrist Angle</span>
+              <span className="text-xl font-mono font-bold text-purple-400">{wristAngle}°</span>
+            </div>
+          </div>
+
+          {/* SEGMENT LENGTHS */}
+          <div className="space-y-2">
+            <div className="p-2.5 bg-slate-900 rounded border border-slate-700 flex justify-between items-center">
+              <div>
+                <span className="text-xs text-slate-400 block">Shoulder-Elbow</span>
+                <span className="text-lg font-mono font-bold text-blue-400">{mmShoulderElbow} mm</span>
+              </div>
+              <span className="text-xs font-mono text-slate-500">{pxShoulderElbow.toFixed(0)} px</span>
             </div>
 
-            <div className="p-3 bg-slate-900 rounded border border-slate-700">
-              <span className="text-xs text-slate-400 uppercase tracking-wider block">
-                Acromion-Olecranon Segment
-              </span>
-              <div className="flex justify-between items-baseline mt-1">
-                <span className="text-2xl font-mono font-bold text-blue-400">
-                  {mmAcromionOlecranon} mm
-                </span>
-                <span className="text-sm font-mono text-slate-400">
-                  ({cmAcromionOlecranon} cm / {pxAcromionOlecranon.toFixed(0)} px)
-                </span>
+            <div className="p-2.5 bg-slate-900 rounded border border-slate-700 flex justify-between items-center">
+              <div>
+                <span className="text-xs text-slate-400 block">Elbow-Wrist</span>
+                <span className="text-lg font-mono font-bold text-emerald-400">{mmElbowWrist} mm</span>
               </div>
+              <span className="text-xs font-mono text-slate-500">{pxElbowWrist.toFixed(0)} px</span>
             </div>
 
-            <div className="p-3 bg-slate-900 rounded border border-slate-700">
-              <span className="text-xs text-slate-400 uppercase tracking-wider block">
-                Olecranon-Styloid Segment
-              </span>
-              <div className="flex justify-between items-baseline mt-1">
-                <span className="text-2xl font-mono font-bold text-purple-400">
-                  {mmOlecranonStyloid} mm
-                </span>
-                <span className="text-sm font-mono text-slate-400">
-                  ({pxOlecranonStyloid.toFixed(0)} px)
-                </span>
+            <div className="p-2.5 bg-slate-900 rounded border border-slate-700 flex justify-between items-center">
+              <div>
+                <span className="text-xs text-slate-400 block">Wrist-Knuckle</span>
+                <span className="text-lg font-mono font-bold text-orange-400">{mmWristKnuckle} mm</span>
               </div>
+              <span className="text-xs font-mono text-slate-500">{pxWristKnuckle.toFixed(0)} px</span>
+            </div>
+
+            <div className="p-3 bg-slate-950 rounded border border-slate-700 flex justify-between items-center mt-2">
+              <span className="text-xs font-semibold text-slate-300 uppercase">Total Chain Length</span>
+              <span className="text-xl font-mono font-bold text-amber-400">{totalChainMm} mm</span>
             </div>
           </div>
         </div>

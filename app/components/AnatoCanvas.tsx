@@ -11,9 +11,10 @@ export interface PinPosition {
 }
 
 export interface LandmarkPins {
-  acromion: PinPosition;
-  olecranon: PinPosition;
-  styloid: PinPosition;
+  shoulder: PinPosition;
+  elbow: PinPosition;
+  wrist: PinPosition;
+  knuckle: PinPosition;
 }
 
 export interface CalibrationPins {
@@ -60,7 +61,6 @@ export default function AnatoCanvas({
     };
 
     let newScale = e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy;
-    // Limit zoom boundaries between 0.5x and 5x
     newScale = Math.max(0.5, Math.min(5, newScale));
 
     setStageScale(newScale);
@@ -70,7 +70,6 @@ export default function AnatoCanvas({
     });
   };
 
-  // Reset zoom and pan view
   const handleResetView = () => {
     setStageScale(1);
     setStagePos({ x: 0, y: 0 });
@@ -159,77 +158,106 @@ export default function AnatoCanvas({
             fontStyle="bold"
           />
 
-          {/* --- KINEMATIC CONNECTION LINES --- */}
+          {/* --- MULTI-SEGMENT KINEMATIC CHAIN LINES --- */}
+          {/* Segment 1: Shoulder to Elbow */}
           <Line
-            points={[pins.acromion.x, pins.acromion.y, pins.olecranon.x, pins.olecranon.y]}
+            points={[pins.shoulder.x, pins.shoulder.y, pins.elbow.x, pins.elbow.y]}
             stroke="#3b82f6"
             strokeWidth={3 / stageScale}
             dash={[5 / stageScale, 5 / stageScale]}
           />
+          {/* Segment 2: Elbow to Wrist */}
           <Line
-            points={[pins.olecranon.x, pins.olecranon.y, pins.styloid.x, pins.styloid.y]}
+            points={[pins.elbow.x, pins.elbow.y, pins.wrist.x, pins.wrist.y]}
             stroke="#10b981"
             strokeWidth={3 / stageScale}
             dash={[5 / stageScale, 5 / stageScale]}
           />
+          {/* Segment 3: Wrist to Knuckle */}
+          <Line
+            points={[pins.wrist.x, pins.wrist.y, pins.knuckle.x, pins.knuckle.y]}
+            stroke="#f97316"
+            strokeWidth={3 / stageScale}
+            dash={[5 / stageScale, 5 / stageScale]}
+          />
 
-          {/* --- ANATOMICAL PINS --- */}
-          {/* Acromion Pin */}
+          {/* --- ANATOMICAL LANDMARK PINS --- */}
+          {/* Shoulder Pin */}
           <Circle
-            x={pins.acromion.x}
-            y={pins.acromion.y}
+            x={pins.shoulder.x}
+            y={pins.shoulder.y}
             radius={10 / stageScale}
             fill="#3b82f6"
             stroke="#ffffff"
             strokeWidth={2 / stageScale}
             draggable
-            onDragMove={(e) => onPinDrag('acromion', e.target.x(), e.target.y())}
+            onDragMove={(e) => onPinDrag('shoulder', e.target.x(), e.target.y())}
           />
           <Text
-            x={pins.acromion.x + (14 / stageScale)}
-            y={pins.acromion.y - (6 / stageScale)}
-            text="Acromion"
+            x={pins.shoulder.x + (14 / stageScale)}
+            y={pins.shoulder.y - (6 / stageScale)}
+            text="Shoulder"
             fill="#60a5fa"
             fontSize={12 / stageScale}
             fontStyle="bold"
           />
 
-          {/* Olecranon Pin */}
+          {/* Elbow Pin */}
           <Circle
-            x={pins.olecranon.x}
-            y={pins.olecranon.y}
+            x={pins.elbow.x}
+            y={pins.elbow.y}
             radius={10 / stageScale}
             fill="#10b981"
             stroke="#ffffff"
             strokeWidth={2 / stageScale}
             draggable
-            onDragMove={(e) => onPinDrag('olecranon', e.target.x(), e.target.y())}
+            onDragMove={(e) => onPinDrag('elbow', e.target.x(), e.target.y())}
           />
           <Text
-            x={pins.olecranon.x + (14 / stageScale)}
-            y={pins.olecranon.y - (6 / stageScale)}
-            text="Olecranon"
+            x={pins.elbow.x + (14 / stageScale)}
+            y={pins.elbow.y - (6 / stageScale)}
+            text="Elbow"
             fill="#34d399"
             fontSize={12 / stageScale}
             fontStyle="bold"
           />
 
-          {/* Styloid Pin */}
+          {/* Wrist Pin */}
           <Circle
-            x={pins.styloid.x}
-            y={pins.styloid.y}
+            x={pins.wrist.x}
+            y={pins.wrist.y}
             radius={10 / stageScale}
             fill="#a855f7"
             stroke="#ffffff"
             strokeWidth={2 / stageScale}
             draggable
-            onDragMove={(e) => onPinDrag('styloid', e.target.x(), e.target.y())}
+            onDragMove={(e) => onPinDrag('wrist', e.target.x(), e.target.y())}
           />
           <Text
-            x={pins.styloid.x + (14 / stageScale)}
-            y={pins.styloid.y - (6 / stageScale)}
-            text="Styloid"
+            x={pins.wrist.x + (14 / stageScale)}
+            y={pins.wrist.y - (6 / stageScale)}
+            text="Wrist"
             fill="#c084fc"
+            fontSize={12 / stageScale}
+            fontStyle="bold"
+          />
+
+          {/* Knuckle Pin */}
+          <Circle
+            x={pins.knuckle.x}
+            y={pins.knuckle.y}
+            radius={10 / stageScale}
+            fill="#f97316"
+            stroke="#ffffff"
+            strokeWidth={2 / stageScale}
+            draggable
+            onDragMove={(e) => onPinDrag('knuckle', e.target.x(), e.target.y())}
+          />
+          <Text
+            x={pins.knuckle.x + (14 / stageScale)}
+            y={pins.knuckle.y - (6 / stageScale)}
+            text="Knuckle"
+            fill="#fb923c"
             fontSize={12 / stageScale}
             fontStyle="bold"
           />
